@@ -1,0 +1,100 @@
+---
+title: "Stock portfolio simulation"
+author: "Rohan Agarwal"
+date: '2022-08-31'
+output: html_document
+---
+## Using data on seven stocks from Yahoo! Finance to graph stock prices. 
+The following stocks were used in this analysis: 
+- Apple
+- Amazon
+- Google 
+- Meta 
+- Microsoft 
+- Netflix 
+- Uber \n
+The data range is from March 03, 2022 to August 30, 2022. \n
+
+
+```{r setup and libraries}
+# Loading the required packages 
+knitr::opts_chunk$set(echo = TRUE)
+setwd("~/Desktop/HFT/Stock_market_program /Stock-Price-Graphing")
+library(haven)
+library(Hmisc)
+library(stargazer)
+library(dplyr)
+library (zoo)
+library(readr)
+library(ggplot2)
+library (TSstudio)
+```
+
+## Loading and cleaning the data \n
+The data from Yahoo! Finance was downloaded as 7 separate .CSV files. \n
+It will be loaded as seven separate data frames and then cleaned using the **zoo** package. 
+
+```{r dataset}
+
+# First, we will load 7 data frames containing the data downloaded from Yahoo, which has daily highs, lows, and closing prices 
+# for the seven stocks we are interested in. 
+aapl.df <- read.csv("AAPL.csv", header = TRUE, stringsAsFactors = FALSE)
+amzn.df <- read.csv("AMZN.csv", header = TRUE, stringsAsFactors = FALSE)
+goog.df <- read.csv("GOOG.csv", header = TRUE, stringsAsFactors = FALSE)
+meta.df <- read.csv("META.csv", header = TRUE, stringsAsFactors = FALSE)
+msft.df <- read.csv("MSFT.csv", header = TRUE, stringsAsFactors = FALSE)
+nflx.df <- read.csv("NFLX.csv", header = TRUE, stringsAsFactors = FALSE)
+uber.df <- read.csv("UBER.csv", header = TRUE, stringsAsFactors = FALSE)
+
+# Now, we subset the data so that only the adjusted closing price is retained. 
+
+aapl.cl.df <- subset(aapl.df, select = c(Date, Close))
+amzn.cl.df <- subset(amzn.df, select = c(Date, Close))
+goog.cl.df <- subset(goog.df, select = c(Date, Close))
+meta.cl.df <- subset(meta.df, select = c(Date, Close))
+msft.cl.df <- subset(msft.df, select = c(Date, Close))
+nflx.cl.df <- subset(nflx.df, select = c(Date, Close))
+uber.cl.df <- subset(uber.df, select = c(Date, Close))
+
+# Reassigning the column names so that there is no confusion after the data is merged. 
+colnames(aapl.cl.df)<- c("Date", "Apple adjusted closing share price")
+colnames(amzn.cl.df)<- c("Date", "Amazon adjusted closing share price")
+colnames(goog.cl.df)<- c("Date", "Google adjusted closing share price")
+colnames(meta.cl.df)<- c("Date", "Meta adjusted closing share price")
+colnames(msft.cl.df)<- c("Date", "Microsoft adjusted closing share price")
+colnames(nflx.cl.df)<- c("Date", "Netflix adjusted closing share price")
+colnames(uber.cl.df)<- c("Date", "Uber adjusted closing share price")
+
+```
+
+```{r}
+
+# We use the **zoo** package designed to handle arbitrarily ordered time index time-series data. 
+td = as.Date(aapl.cl.df$Date, format = "%Y-%m-%d")
+
+aapl.z <- zoo(x = aapl.cl.df$`Apple adjusted closing share price`, order.by=td)
+amzn.z <- zoo(x = amzn.cl.df$`Amazon adjusted closing share price`, order.by=td)
+goog.z <- zoo(x = goog.cl.df$`Google adjusted closing share price`, order.by=td)
+meta.z <- zoo(x = meta.cl.df$`Meta adjusted closing share price`, order.by=td)
+msft.z <- zoo(x = msft.cl.df$`Microsoft adjusted closing share price`, order.by=td)
+nflx.z <- zoo(x = nflx.cl.df$`Netflix adjusted closing share price`, order.by=td)
+uber.z <- zoo(x = uber.cl.df$`Uber adjusted closing share price`, order.by=td)
+head(aapl.z)
+# Merging the seven *zoo* objects into one
+stocks.z <- cbind(aapl.z, amzn.z, goog.z, meta.z, msft.z, nflx.z, uber.z)
+
+#Changing the names of the columns 
+colnames(stocks.z)<- c("Apple", "Amazon", "Google", "Meta", "Microsoft", "Netflix", "Uber")
+head(stocks.z)
+# Plotting the stocks to get an idea of what stock price fluctuations were like. 
+plot (stocks.z, plot.type = 'single',
+      col = c(1:7),
+      xlab = "Dates",
+      ylab = "Daily closing stock prices for seven tech companies", 
+      sub = "Year: 2022",
+      )
+legend("topright", inset = c(0,0), legend = c("Apple", "Amazon", "Google", "Meta", "Microsoft", "Netflix", "Uber"), cex = 0.5, 
+       col = c(1:7),
+       lty = 1, bty = "n"
+)
+```

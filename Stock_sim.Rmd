@@ -1,0 +1,181 @@
+---
+title: "Stock portfolio sim"
+author: "Rohan Agarwal"
+date: '2022-09-01'
+output: html_document
+---
+
+## Using data on seven stocks from Yahoo! Finance to simulate a portfolio of technology stocks. \n
+
+The following stocks were used for this analysis:   \n  
+- Apple  \n
+- Amazon  \n
+- Google \n
+- Meta \n
+- Microsoft  \n 
+- Netflix   \n
+- Uber \n
+The data range is from March 03, 2022 to August 30, 2022. \n
+
+```{r setup}
+# Loading the required packages 
+knitr::opts_chunk$set(echo = TRUE)
+rm(list=ls())
+setwd ("~/Desktop/HFT/Stock_market_program /Stock-Price-Graphing")
+library(haven)
+library(Hmisc)
+library(stargazer)
+library(dplyr)
+library (zoo)
+library(readr)
+library(ggplot2)
+library (TSstudio)
+library(data.table)
+library(tidyverse)
+```
+
+
+
+```{r loading data}
+
+# First, we will load 7 data frames containing the data downloaded from Yahoo, which has daily highs, lows, and closing prices 
+# for the seven stocks we are interested in. 
+aapl.df <- read.csv("AAPL.csv", header = TRUE, stringsAsFactors = FALSE)
+amzn.df <- read.csv("AMZN.csv", header = TRUE, stringsAsFactors = FALSE)
+goog.df <- read.csv("GOOG.csv", header = TRUE, stringsAsFactors = FALSE)
+meta.df <- read.csv("META.csv", header = TRUE, stringsAsFactors = FALSE)
+msft.df <- read.csv("MSFT.csv", header = TRUE, stringsAsFactors = FALSE)
+nflx.df <- read.csv("NFLX.csv", header = TRUE, stringsAsFactors = FALSE)
+uber.df <- read.csv("UBER.csv", header = TRUE, stringsAsFactors = FALSE)
+
+# Now, we subset the data so that only the adjusted closing price is retained. 
+
+aapl.cl.df <- subset(aapl.df, select = c(Date, Close))
+amzn.cl.df <- subset(amzn.df, select = c(Date, Close))
+goog.cl.df <- subset(goog.df, select = c(Date, Close))
+meta.cl.df <- subset(meta.df, select = c(Date, Close))
+msft.cl.df <- subset(msft.df, select = c(Date, Close))
+nflx.cl.df <- subset(nflx.df, select = c(Date, Close))
+uber.cl.df <- subset(uber.df, select = c(Date, Close))
+
+# Reassigning the column names so that there is no confusion after the data is merged. 
+colnames(aapl.cl.df)<- c("Date", "Apple")
+colnames(amzn.cl.df)<- c("Date", "Amazon")
+colnames(goog.cl.df)<- c("Date", "Google")
+colnames(meta.cl.df)<- c("Date", "Meta")
+colnames(msft.cl.df)<- c("Date", "Microsoft")
+colnames(nflx.cl.df)<- c("Date", "Netflix")
+colnames(uber.cl.df)<- c("Date", "Uber")
+
+# The **inner_join** function from *tidyverse* allows for only two data frames to be joined each time by a common variable, \n
+# so the process has to be repeated to add each stock individually.
+stocks1 <- inner_join(aapl.cl.df, amzn.cl.df,
+                     by = "Date")
+stocks2 <- inner_join(stocks1, goog.cl.df,
+                     by = "Date")
+stocks3 <- inner_join(stocks2, meta.cl.df,
+                     by = "Date")
+stocks4 <- inner_join(stocks3, msft.cl.df,
+                     by = "Date")
+stocks5 <- inner_join(stocks4, nflx.cl.df,
+                     by = "Date")
+stocks <- inner_join(stocks5, uber.cl.df,
+                     by = "Date")
+
+
+```
+```{r}
+rdate <- as.Date(stocks$Date, "%Y-%m-%d")
+head(stocks)
+# Storing the data frame as a **csv** file for later access. 
+data.table::fwrite(stocks, "~\\Desktop\\HFT\\Stock market program\\stocks.csv")
+```
+
+
+```{r}
+stock_price = as.matrix(stocks[, 2:8])
+head(stock_price)
+
+## MC parameters 
+mc_rep = 10000
+trading_days = 60
+
+# The function below returns the first differences of a t X q matrix
+returns = function(Y){
+  len = nrow(Y)
+  yDif = Y[2:len, ] / Y[1:len-1, ] - 1
+}
+
+# Get the Stock Returns
+stock_Returns = returns(stock_price)
+head(stock_Returns)
+```
+
+
+```{r}
+# Suppose we invest our money evenly among all three assets 
+# We use today's Price 11/14/2018 to find the number of shares each stock 
+# that we buy
+portfolio_Weights = t(as.matrix(rep(1/ncol(stock_Returns), ncol(stock_Returns))))
+print(portfolio_Weights)
+```
+
+
+```{r}
+# Get the Variance Covariance Matrix of Stock Returns
+coVarMat = cov(stock_Returns)
+miu = colMeans(stock_Returns)
+# Extend the vector to a matrix
+Miu = matrix(rep(miu, trading_days), nrow = 7)
+```
+
+
+
+```{r}
+# Initializing simulated 30 day portfolio returns
+portfolio_Returns_30_m = matrix(0, trading_days, mc_rep)
+
+set.seed(200)
+for (i in 1:mc_rep) {
+  Z = matrix ( rnorm( dim(stock_Returns)[2] * trading_days ), ncol = trading_days )
+  # Lower Triangular Matrix from our Choleski Factorization
+  L = t( chol(coVarMat) )
+  # Calculate stock returns for each day
+  daily_Returns = Miu + L %*% Z  
+  # Calculate portfolio returns for 30 days
+  portfolio_Returns_30 = cumprod( portfolio_Weights %*% daily_Returns + 1 )
+  # Add it to the monte-carlo matrix
+  portfolio_Returns_30_m[,i] = portfolio_Returns_30;
+}
+```
+
+## Visualizing the results 
+```{r}
+# Visualising result
+x_axis = rep(1:trading_days, mc_rep)
+y_axis = as.vector(portfolio_Returns_30_m-1)
+plot_data = data.frame(x_axis, y_axis)
+ggplot(data = plot_data, aes(x = x_axis, y = y_axis)) + geom_path(col = "blue", size = 0.1) +
+  xlab('Days') + ylab('Portfolio Returns') + 
+  ggtitle('Simulated Portfolio Returns in 30 days')+
+  theme_bw() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+```
+
+
+
+```{r}
+# Porfolio Returns statistics on the 30th day.
+Avg_Portfolio_Returns = mean(portfolio_Returns_30_m[30,]-1)
+SD_Portfolio_Returns = sd(portfolio_Returns_30_m[30,]-1)
+Median_Portfolio_Returns = median(portfolio_Returns_30_m[30,]-1)
+print(c(Avg_Portfolio_Returns,SD_Portfolio_Returns,Median_Portfolio_Returns))
+```
+
+
+```{r}
+# Construct a 95% Confidential Interval for average returns
+Avg_CI = quantile(portfolio_Returns_30_m[30,]-1, c(0.025, 0.975))
+print(Avg_CI)
+```
